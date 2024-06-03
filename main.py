@@ -1,12 +1,21 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from typing import List, Any, Dict
 import requests
 import asyncio
 from datetime import datetime
 
-
 app = FastAPI()
+
+# Настройка CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],  # URL вашего React приложения
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 class ConnectionManager:
@@ -27,7 +36,8 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-HTML = """<!DOCTYPE html>
+HTML = '''
+<!DOCTYPE html>
 <html>
     <head>
         <title>Live Currency Rates</title>
@@ -47,7 +57,8 @@ HTML = """<!DOCTYPE html>
             };
         </script>
     </body>
-</html>"""
+</html>
+'''
 
 
 @app.get('/')
@@ -55,7 +66,7 @@ async def get():
     return HTMLResponse(HTML)
 
 
-@app.websocket('/ws/currency/')
+@app.websocket('/ws/currency')
 async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
     try:
@@ -66,27 +77,26 @@ async def websocket_endpoint(websocket: WebSocket):
 
 
 async def fetch_currency_rates():
-    url = "https://open.er-api.com/v6/latest/USD"
+    url = 'https://open.er-api.com/v6/latest/USD'
     response = requests.get(url)
     data = response.json()
-    timestamps = datetime.now().isoformat()
+    times = datetime.now().isoformat()
     if response.status_code == 200:
-        rate = data["rates"]
-
+        rates = data['rates']
         return {
-            "time": timestamps,
-            "currency": "BYN",
-            "rate": rate['BYN'],
+            'time': times,
+            'currency': 'BYN',
+            'rate': rates['BYN']
         }
     else:
         return {
-            "time": timestamps,
-            "currency": "BYN",
-            "rate": None,
+            'time': times,
+            'currency': 'BYN',
+            'rate': None
         }
 
 
-async def send_currency_updates():
+async def send_currency_update():
     while True:
         await asyncio.sleep(2)
         data = await fetch_currency_rates()
@@ -95,4 +105,4 @@ async def send_currency_updates():
 
 @app.on_event('startup')
 async def startup_event():
-    asyncio.create_task(send_currency_updates())
+    asyncio.create_task(send_currency_update())
